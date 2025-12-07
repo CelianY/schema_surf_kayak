@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulateur Technique : Entrée en Vague</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            background-color: #0f172a; 
+            font-family: 'Inter', sans-serif; 
+            color: #e2e8f0;
+            overflow: hidden;
+        }
+        
+        /* Layout Grid */
+        .app-container {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* Sidebar Styling */
+        .sidebar {
+            background-color: #1e293b;
+            border-right: 1px solid #334155;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 4px 0 24px rgba(0,0,0,0.3);
+            z-index: 20;
+        }
+
+        .phase-card {
+            background: #334155;
+            border-left: 4px solid transparent;
+            padding: 16px;
+            margin-bottom: 12px;
+            border-radius: 0 8px 8px 0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            opacity: 0.7;
+        }
+
+        .phase-card:hover {
+            background: #475569;
+            opacity: 1;
+        }
+
+        .phase-card.active {
+            background: #2563eb; /* Blue 600 */
+            border-left-color: #60a5fa; /* Blue 400 */
+            opacity: 1;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+        /* Canvas Area */
+        .canvas-area {
+            position: relative;
+            background: #0f172a;
+        }
+
+        /* HUD Overlay */
+        .hud {
+            position: absolute;
+            bottom: 24px;
+            right: 24px;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(4px);
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid #334155;
+            display: flex;
+            gap: 24px;
+            pointer-events: none;
+        }
+
+        .hud-metric {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .hud-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #94a3b8;
+            margin-bottom: 4px;
+        }
+
+        .hud-value {
+            font-weight: 700;
+            font-size: 1.25rem;
+            color: white;
+        }
+
+        /* Gauge Visuals */
+        .tilt-gauge {
+            width: 60px;
+            height: 6px;
+            background: #475569;
+            border-radius: 3px;
+            position: relative;
+            overflow: hidden;
+        }
+        .tilt-fill {
+            height: 100%;
+            width: 50%;
+            background: #f59e0b;
+            position: absolute;
+            left: 25%;
+            transition: all 0.1s;
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="app-container">
+    <!-- SIDEBAR: Controls & Explanations -->
+    <aside class="sidebar p-6 overflow-y-auto">
+        <header class="mb-8">
+            <h1 class="text-2xl font-bold text-white tracking-tight">Technique Kayak</h1>
+            <p class="text-slate-400 text-sm mt-1">Analyse biomécanique & trajectoire</p>
+        </header>
+
+        <nav class="flex flex-col gap-2">
+            <div class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Séquence</div>
+            
+            <div class="phase-card active" onclick="setPhase(0)" id="card-0">
+                <div class="flex justify-between items-center mb-1">
+                    <h3 class="font-bold text-white">1. Approche & Percussion</h3>
+                    <span class="text-xs bg-black/20 px-2 py-0.5 rounded text-white/80">00:00</span>
+                </div>
+                <p class="text-sm text-slate-200 leading-snug">
+                    Prise de vitesse et franchissement de la zone de cisaillement.
+                </p>
+            </div>
+
+            <div class="phase-card" onclick="setPhase(1)" id="card-1">
+                <div class="flex justify-between items-center mb-1">
+                    <h3 class="font-bold text-white">2. Maintien (Surf)</h3>
+                    <span class="text-xs bg-black/20 px-2 py-0.5 rounded text-white/80">∞ Loop</span>
+                </div>
+                <p class="text-sm text-slate-200 leading-snug">
+                    Stabilisation dynamique dans le creux de la vague.
+                </p>
+            </div>
+
+            <div class="phase-card" onclick="setPhase(2)" id="card-2">
+                <div class="flex justify-between items-center mb-1">
+                    <h3 class="font-bold text-white">3. Sortie</h3>
+                    <span class="text-xs bg-black/20 px-2 py-0.5 rounded text-white/80">Fin</span>
+                </div>
+                <p class="text-sm text-slate-200 leading-snug">
+                    Extraction par ouverture d'angle et dérive.
+                </p>
+            </div>
+        </nav>
+
+        <div class="mt-8 border-t border-slate-700 pt-6">
+            <h4 class="text-sm font-bold text-blue-400 mb-3 uppercase">Points Clés</h4>
+            <div id="details-panel" class="text-sm text-slate-300 space-y-3 leading-relaxed">
+                <!-- Dynamic Content inserted via JS -->
+            </div>
+        </div>
+
+        <div class="mt-auto pt-8 text-xs text-slate-600">
+            Visualisation interactive v2.2
+        </div>
+    </aside>
+
+    <!-- MAIN VIEW: Canvas -->
+    <main class="canvas-area">
+        <canvas id="simCanvas"></canvas>
+        
+        <!-- Heads Up Display (HUD) -->
+        <div class="hud">
+            <!-- Vitesse supprimée ici -->
+            
+            <div class="hud-metric w-24">
+                <span class="hud-label">Gîte</span>
+                <div class="tilt-gauge mt-2">
+                    <div id="hud-tilt-bar" class="tilt-fill"></div>
+                </div>
+                <span id="hud-tilt-val" class="text-xs text-slate-400 mt-1">Neutre</span>
+            </div>
+            <div class="hud-metric">
+                <span class="hud-label">Action Pagaie</span>
+                <span id="hud-paddle" class="text-sm font-bold text-orange-400 mt-1">--</span>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    /**
+     * UTILS
+     */
+    function lerp(start, end, factor) {
+        return start + (end - start) * factor;
+    }
+
+    /**
+     * CONFIGURATION & CONSTANTS
+     */
+    const canvas = document.getElementById('simCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Physics constants
+    const WAVE_POS_Y_RATIO = 0.45;
+    const SHEAR_POS_X_RATIO = 0.35;
+    const ROCK_HEIGHT = 140;
+
+    // State management
+    let state = {
+        phase: 0,
+        time: 0,
+        cw: 0,
+        ch: 0
+    };
+
+    let kayak = {
+        x: 0, y: 0,
+        angle: 0,     // Direction du bateau (actuel)
+        targetAngle: 0, // Cible pour interpolation
+        tilt: 0,      // Actuel
+        targetTilt: 0,// Cible
+        speed: 0,     
+        paddleSide: null, 
+        paddlePower: 0,
+        label: ""
+    };
+
+    const particles = [];
+
+    /**
+     * INITIALIZATION & RESIZE
+     */
+    function init() {
+        resize();
+        window.addEventListener('resize', resize);
+        setPhase(0);
+        loop();
+    }
+
+    function resize() {
+        state.cw = canvas.width = canvas.parentElement.clientWidth;
+        state.ch = canvas.height = canvas.parentElement.clientHeight;
+        initParticles();
+    }
+
+    /**
+     * PARTICLE SYSTEM (Flow Visualization)
+     */
+    class Particle {
+        constructor() {
+            this.reset();
+        }
+        reset() {
+            // Spawn logic: mostly in main current, some sparse in eddy
+            if(Math.random() > 0.1) {
+                // Main Current
+                this.x = (Math.random() * (1 - SHEAR_POS_X_RATIO) + SHEAR_POS_X_RATIO) * state.cw;
+                this.y = Math.random() * state.ch;
+                this.speed = Math.random() * 3 + 2;
+                this.type = 'fast';
+            } else {
+                // Eddy (slower, chaotic)
+                this.x = Math.random() * (state.cw * SHEAR_POS_X_RATIO);
+                this.y = Math.random() * state.ch;
+                this.speed = Math.random() * 0.5 + 0.2;
+                this.type = 'slow';
+            }
+            this.size = Math.random() * 2 + 1;
+            this.alpha = Math.random() * 0.3 + 0.1;
+        }
+
+        update() {
+            if (this.type === 'fast') {
+                this.y += this.speed * 1.5;
+                // Wave turbulence effect
+                if (this.y > state.ch * WAVE_POS_Y_RATIO && this.y < state.ch * (WAVE_POS_Y_RATIO + 0.2)) {
+                    this.x += (Math.random() - 0.5) * 2; 
+                }
+                if (this.y > state.ch) this.reset();
+            } else {
+                // Eddy circulation (simplified)
+                this.y -= this.speed;
+                if (this.y < 0) this.reset();
+            }
+        }
+
+        draw(ctx) {
+            ctx.fillStyle = this.type === 'fast' 
+                ? `rgba(200, 240, 255, ${this.alpha})` 
+                : `rgba(100, 150, 200, ${this.alpha * 0.5})`;
+            
+            // Draw trails instead of dots for "speed" feel
+            const length = this.type === 'fast' ? this.speed * 8 : this.speed * 2;
+            ctx.beginPath();
+            ctx.rect(this.x, this.y, this.size, length);
+            ctx.fill();
+        }
+    }
+
+    function initParticles() {
+        particles.length = 0;
+        const count = 150;
+        for(let i=0; i<count; i++) particles.push(new Particle());
+    }
+
+    /**
+     * LOGIC CONTROL
+     */
+    function setPhase(p) {
+        state.phase = p;
+        state.time = 0;
+        
+        // UI Updates
+        document.querySelectorAll('.phase-card').forEach((el, idx) => {
+            el.classList.toggle('active', idx === p);
+        });
+        updateDescription(p);
+        resetKayak(p);
+    }
+
+    function updateDescription(p) {
+        const el = document.getElementById('details-panel');
+        if (p === 0) {
+            el.innerHTML = `
+                <div class="flex items-start gap-3">
+                    <div class="bg-blue-900 text-blue-300 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold mt-1">1</div>
+                    <div><span class="text-white font-semibold">Prise de vitesse</span> : Dans le contre-courant, pointe avant dirigée vers l'amont (angle d'attente actif).</div>
+                </div>
+                <div class="flex items-start gap-3 border-l-2 border-orange-500 pl-3 ml-3 my-2">
+                    <div><span class="text-orange-400 font-semibold">Percussion</span> : Coup de pagaie <b class="text-white">Main Intérieure</b> (Droite). L'angle reste fermé/constant (~20°).</div>
+                </div>
+                <div class="flex items-start gap-3">
+                    <div class="bg-blue-900 text-blue-300 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold mt-1">2</div>
+                    <div><span class="text-white font-semibold">Gîte Sécuritaire</span> : Maintenue vers l'aval (côté courant) pour présenter la coque à l'eau qui arrive.</div>
+                </div>
+            `;
+        } else if (p === 1) {
+            el.innerHTML = `
+                <p class="mb-2 font-semibold text-white">Les 5 éléments de contrôle :</p>
+                <ul class="list-disc pl-4 space-y-2 marker:text-blue-500">
+                    <li><b>Propulsion</b> : Corrections longitudinales pour ne pas glisser hors de la vague.</li>
+                    <li><b>Assiette</b> : Gestion uniquement avec le poids du corps (sans pagaie).</li>
+                    <li><b>Gîte, Appels Arrière & Circulaires</b> : Gestion fine du positionnement latéral.</li>
+                </ul>
+            `;
+        } else {
+            el.innerHTML = `
+                <div class="flex items-start gap-3">
+                    <div class="bg-blue-900 text-blue-300 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold mt-1">1</div>
+                    <div><span class="text-white font-semibold">Ouverture</span> : Changement de cap, pointe avant vers le courant principal.</div>
+                </div>
+                <div class="flex items-start gap-3">
+                    <div class="bg-blue-900 text-blue-300 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold mt-1">2</div>
+                    <div><span class="text-white font-semibold">Dérive</span> : Utilisation de la gîte pour se laisser emporter naturellement par le flux.</div>
+                </div>
+            `;
+        }
+    }
+
+    function resetKayak(p) {
+        // Position reset based on phase, but allow lerp to smooth transitions if consecutive
+        if (p === 0) {
+            kayak.x = state.cw * 0.15;
+            kayak.y = state.ch * 0.85;
+            kayak.targetAngle = Math.PI / 8; 
+            kayak.angle = kayak.targetAngle; // Hard reset for start
+            kayak.targetTilt = 0;
+            kayak.tilt = 0;
+            kayak.speed = 2;
+        } else if (p === 1) {
+            kayak.x = state.cw * 0.55;
+            kayak.y = state.ch * WAVE_POS_Y_RATIO + 40;
+            kayak.targetAngle = 0;
+            kayak.angle = 0;
+            kayak.targetTilt = 0;
+            kayak.tilt = 0;
+            kayak.speed = 0;
+        } else {
+            kayak.x = state.cw * 0.55;
+            kayak.y = state.ch * WAVE_POS_Y_RATIO + 40;
+            kayak.targetAngle = 0;
+            kayak.angle = 0;
+            kayak.targetTilt = 0;
+            kayak.tilt = 0;
+            kayak.speed = 4;
+        }
+    }
+
+    /**
+     * PHYSICS LOOP
+     */
+    function updatePhysics() {
+        state.time += 0.016; 
+        
+        // Smoothing function for all phases
+        kayak.angle = lerp(kayak.angle, kayak.targetAngle, 0.05);
+        kayak.tilt = lerp(kayak.tilt, kayak.targetTilt, 0.05);
+
+        if (state.phase === 0) {
+            // PHASE 1: ENTREE
+            if (state.time < 2.0) {
+                // Montée
+                kayak.x += 1.2;
+                kayak.y -= 0.8;
+                kayak.targetAngle = Math.PI / 8; 
+                kayak.label = "Prise de vitesse";
+                kayak.paddleSide = null;
+                kayak.targetTilt = 0;
+                kayak.speed = 5.2; 
+            } else if (state.time < 4.0) {
+                // Traversée
+                const targetX = state.cw * SHEAR_POS_X_RATIO + 60;
+                const targetY = state.ch * WAVE_POS_Y_RATIO;
+                kayak.x = lerp(kayak.x, targetX, 0.03); // Smoother approach
+                kayak.y = lerp(kayak.y, targetY, 0.03);
+                
+                kayak.targetAngle = Math.PI / 8;
+                kayak.targetTilt = 1.0; 
+                kayak.paddleSide = 'right';
+                kayak.paddlePower = Math.sin(state.time * 5); 
+                kayak.label = "Percussion (Main Int.)";
+                kayak.speed = 8.5;
+            } else if (state.time < 6.0) {
+                // Stabilisation
+                kayak.x = lerp(kayak.x, state.cw * 0.55, 0.05);
+                kayak.y = lerp(kayak.y, state.ch * WAVE_POS_Y_RATIO + 40, 0.05);
+                kayak.targetAngle = 0;
+                kayak.targetTilt = 0;
+                kayak.paddleSide = null;
+                kayak.label = "Entrée réussie";
+                kayak.speed = 6.0;
+            } else {
+                state.time = 0;
+                resetKayak(0);
+            }
+        } 
+        else if (state.phase === 1) {
+            // PHASE 2: SURF
+            const cycle = (Date.now() / 4000) % 3;
+            const baseX = state.cw * 0.55;
+            const baseY = state.ch * WAVE_POS_Y_RATIO + 40;
+            
+            if (cycle < 1) {
+                // Demo Assiette
+                const oscY = Math.sin(Date.now()/500) * 12;
+                kayak.y = lerp(kayak.y, baseY + oscY, 0.1); // Smooth follow
+                kayak.x = lerp(kayak.x, baseX, 0.1);
+                kayak.targetTilt = 0;
+                kayak.label = "Contrôle Assiette (Corps)";
+                kayak.paddleSide = null;
+                kayak.speed = 7.1;
+            } else if (cycle < 2) {
+                // Demo Gîte
+                const oscillation = Math.sin(Date.now()/1000); 
+                kayak.x = lerp(kayak.x, baseX + oscillation * 25, 0.1);
+                kayak.y = lerp(kayak.y, baseY, 0.1);
+                
+                kayak.targetTilt = oscillation;
+                kayak.targetAngle = oscillation * 0.2;
+                kayak.label = "Ajustement Latéral";
+                
+                kayak.paddleSide = oscillation > 0.2 ? 'left' : (oscillation < -0.2 ? 'right' : null);
+                kayak.speed = 6.8;
+            } else {
+                // Stable
+                kayak.x = lerp(kayak.x, baseX, 0.1);
+                kayak.y = lerp(kayak.y, baseY, 0.1);
+                kayak.targetTilt = 0;
+                kayak.targetAngle = 0;
+                kayak.label = "Surf Stable";
+                kayak.paddleSide = null;
+                kayak.speed = 7.0;
+            }
+        } 
+        else if (state.phase === 2) {
+            // PHASE 3: SORTIE (Trajectoire plus horizontale)
+            if (state.time < 1.0) {
+                kayak.targetAngle = -Math.PI / 3; 
+                kayak.targetTilt = -1; 
+                kayak.label = "Ouverture Angle";
+                kayak.paddleSide = 'right'; 
+                kayak.speed = 5.5;
+            } else if (state.time < 3.5) {
+                // Modification de la trajectoire ici
+                // Plus de X (négatif = vers la gauche/contre), Moins de Y (positif = vers le bas)
+                kayak.x -= 3.5; 
+                kayak.y += 1.5; 
+                
+                kayak.label = "Dérive";
+                kayak.speed = 9.0;
+                kayak.paddleSide = null;
+            } else {
+                state.time = 0;
+                resetKayak(2);
+            }
+        }
+        
+        updateHUD();
+    }
+
+    function updateHUD() {
+        const bar = document.getElementById('hud-tilt-bar');
+        const label = document.getElementById('hud-tilt-val');
+        
+        const pct = 50 + (kayak.tilt * 40); 
+        bar.style.left = (50 - (Math.abs(kayak.tilt) * 25)) + "%"; 
+        bar.style.width = (Math.abs(kayak.tilt) * 50) + "%";
+        
+        if(kayak.tilt > 0.2) {
+            bar.style.left = "50%";
+            label.innerText = "Gîte Droite (Aval)";
+            label.className = "text-xs mt-1 text-orange-400 font-bold";
+            bar.style.background = "#f97316";
+        } else if (kayak.tilt < -0.2) {
+            bar.style.left = (50 - (Math.abs(kayak.tilt) * 50)) + "%";
+            label.innerText = "Gîte Gauche (Amont)";
+            label.className = "text-xs mt-1 text-blue-400 font-bold";
+            bar.style.background = "#3b82f6";
+        } else {
+            bar.style.left = "48%";
+            bar.style.width = "4%";
+            label.innerText = "À Plat";
+            label.className = "text-xs mt-1 text-slate-500";
+            bar.style.background = "#94a3b8";
+        }
+
+        const padLab = document.getElementById('hud-paddle');
+        if (kayak.paddleSide === 'right') {
+            padLab.innerText = "MAIN DROITE";
+            padLab.style.color = "#f97316";
+        } else if (kayak.paddleSide === 'left') {
+            padLab.innerText = "MAIN GAUCHE";
+            padLab.style.color = "#3b82f6";
+        } else {
+            padLab.innerText = "--";
+            padLab.style.color = "#475569";
+        }
+    }
+
+    /**
+     * RENDERING
+     */
+    function draw() {
+        ctx.fillStyle = "#0f172a";
+        ctx.fillRect(0, 0, state.cw, state.ch);
+
+        drawRiverEnvironment();
+        
+        particles.forEach(p => {
+            p.update();
+            p.draw(ctx);
+        });
+
+        drawKayakEntity();
+    }
+
+    function drawRiverEnvironment() {
+        const shearX = state.cw * SHEAR_POS_X_RATIO;
+        
+        let gradEddy = ctx.createLinearGradient(0, 0, shearX, 0);
+        gradEddy.addColorStop(0, '#172554'); 
+        gradEddy.addColorStop(1, '#1e3a8a');
+        ctx.fillStyle = gradEddy;
+        ctx.fillRect(0, 0, shearX, state.ch);
+
+        let gradMain = ctx.createLinearGradient(shearX, 0, state.cw, 0);
+        gradMain.addColorStop(0, '#1e40af');
+        gradMain.addColorStop(1, '#2563eb');
+        ctx.fillStyle = gradMain;
+        ctx.fillRect(shearX, 0, state.cw - shearX, state.ch);
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.strokeStyle = "rgba(255,255,255,0.15)";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([10, 15]);
+        ctx.moveTo(shearX, 0);
+        ctx.lineTo(shearX, state.ch);
+        ctx.stroke();
+        ctx.restore();
+
+        drawStyledRock(shearX);
+
+        const waveY = state.ch * WAVE_POS_Y_RATIO;
+        const waveX = state.cw * 0.6;
+        
+        let waveGrad = ctx.createRadialGradient(waveX, waveY, 10, waveX, waveY, 150);
+        waveGrad.addColorStop(0, 'rgba(255, 255, 255, 0.3)');
+        waveGrad.addColorStop(0.4, 'rgba(255, 255, 255, 0.1)');
+        waveGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        
+        ctx.fillStyle = waveGrad;
+        ctx.fillRect(shearX, waveY - 80, state.cw - shearX, 200);
+
+        drawLabels(shearX, waveY);
+    }
+
+    function drawStyledRock(shearWidth) {
+        ctx.save();
+        ctx.fillStyle = "rgba(0,0,0,0.4)";
+        ctx.beginPath();
+        ctx.moveTo(0, 50);
+        ctx.bezierCurveTo(shearWidth/2, 140, shearWidth, 80, shearWidth + 20, 60);
+        ctx.lineTo(shearWidth, 0);
+        ctx.lineTo(0,0);
+        ctx.fill();
+
+        let rockGrad = ctx.createLinearGradient(0, 0, shearWidth, 100);
+        rockGrad.addColorStop(0, '#334155'); 
+        rockGrad.addColorStop(1, '#475569');
+        
+        ctx.fillStyle = rockGrad;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(shearWidth, 0);
+        ctx.lineTo(shearWidth, 40);
+        ctx.lineTo(shearWidth * 0.9, 60);
+        ctx.lineTo(shearWidth * 0.7, 45);
+        ctx.lineTo(shearWidth * 0.4, 90);
+        ctx.lineTo(shearWidth * 0.2, 55);
+        ctx.lineTo(0, 80);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(255,255,255,0.1)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    function drawLabels(shearX, waveY) {
+        ctx.save();
+        ctx.font = "600 12px Inter";
+        ctx.letterSpacing = "1px";
+        ctx.textAlign = "center";
+
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        const cpX = shearX + (state.cw - shearX)/2;
+        ctx.fillText("COURANT PRINCIPAL", cpX, 40);
+        
+        ctx.beginPath();
+        ctx.strokeStyle = "rgba(255,255,255,0.9)";
+        ctx.lineWidth = 2;
+        ctx.moveTo(cpX, 50);
+        ctx.lineTo(cpX, 80);
+        ctx.lineTo(cpX - 5, 75);
+        ctx.moveTo(cpX, 80);
+        ctx.lineTo(cpX + 5, 75);
+        ctx.stroke();
+
+        ctx.fillStyle = "rgba(148, 163, 184, 0.8)";
+        ctx.fillText("CONTRE-COURANT", shearX / 2, state.ch - 60);
+
+        ctx.fillStyle = "rgba(255,255,255,0.5)";
+        ctx.fillText("VAGUE STATIONNAIRE", state.cw * 0.6, waveY - 90);
+
+        ctx.restore();
+    }
+
+    function drawKayakEntity() {
+        ctx.save();
+        ctx.translate(kayak.x, kayak.y);
+        ctx.rotate(kayak.angle);
+
+        ctx.shadowColor = "rgba(0,0,0,0.5)";
+        ctx.shadowBlur = 10;
+        ctx.shadowOffsetY = 5;
+
+        if (kayak.speed > 1) {
+            ctx.save();
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetY = 0;
+            ctx.beginPath();
+            ctx.moveTo(0, 20);
+            ctx.lineTo(-15, 60 + kayak.speed * 2);
+            ctx.lineTo(15, 60 + kayak.speed * 2);
+            ctx.closePath();
+            let wakeGrad = ctx.createLinearGradient(0, 20, 0, 100);
+            wakeGrad.addColorStop(0, 'rgba(255,255,255,0.4)');
+            wakeGrad.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = wakeGrad;
+            ctx.fill();
+            ctx.restore();
+        }
+
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 14, 48, 0, 0, 2 * Math.PI); 
+        ctx.fillStyle = '#f97316'; 
+        ctx.fill();
+        
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        ctx.fillStyle = '#1e293b'; 
+        ctx.beginPath();
+        ctx.ellipse(0, 4, 9, 14, 0, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.fillStyle = "#fbbf24"; 
+        ctx.beginPath();
+        ctx.arc(0, 4, 5, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = "#2563eb";
+        ctx.beginPath();
+        ctx.roundRect(-8, 0, 16, 6, 2);
+        ctx.fill();
+
+        if (Math.abs(kayak.tilt) > 0.1) {
+            ctx.save();
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetY = 0;
+            ctx.beginPath();
+            ctx.strokeStyle = kayak.tilt > 0 ? '#f97316' : '#3b82f6'; 
+            ctx.lineWidth = 3;
+            if (kayak.tilt > 0) {
+                ctx.moveTo(12, -20);
+                ctx.quadraticCurveTo(16, 0, 12, 20);
+            } else {
+                ctx.moveTo(-12, -20);
+                ctx.quadraticCurveTo(-16, 0, -12, 20);
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        drawPaddle(ctx);
+
+        ctx.restore();
+        
+        if (kayak.label) {
+            ctx.font = "bold 14px Inter";
+            ctx.fillStyle = "white";
+            ctx.shadowColor = "black";
+            ctx.shadowBlur = 4;
+            ctx.fillText(kayak.label, kayak.x + 40, kayak.y);
+            ctx.shadowBlur = 0;
+        }
+    }
+
+    function drawPaddle(ctx) {
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(-32, 4); 
+        ctx.lineTo(32, 4);
+        ctx.stroke();
+        
+        ctx.fillStyle = '#e2e8f0'; 
+        
+        // Pales à l'horizontale (plus larges que hautes)
+        // Left Blade
+        ctx.save();
+        ctx.translate(-35, 4);
+        // Inverse dimensions pour effet horizontal
+        ctx.fillRect(-8, -2, 16, 4); 
+        ctx.restore();
+
+        // Right Blade
+        ctx.save();
+        ctx.translate(35, 4);
+        ctx.fillRect(-8, -2, 16, 4);
+        ctx.restore();
+
+        if (kayak.paddleSide) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.lineWidth = 3;
+            ctx.lineCap = "round";
+            ctx.beginPath();
+            if (kayak.paddleSide === 'left') {
+                ctx.arc(-35, 4, 20, Math.PI * 0.5, Math.PI * 1.5);
+            } else {
+                ctx.arc(35, 4, 20, Math.PI * 1.5, Math.PI * 0.5);
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
+
+    /**
+     * MAIN LOOP
+     */
+    function loop() {
+        updatePhysics();
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    // Start
+    init();
+
+</script>
+</body>
+</html>

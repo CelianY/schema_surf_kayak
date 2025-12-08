@@ -340,7 +340,7 @@
                 </div>
                 <div class="flex items-start gap-3">
                     <div class="bg-blue-900 text-blue-300 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold mt-1">2</div>
-                    <div><span class="text-white font-semibold">Gîte Sécuritaire</span> : Maintenue vers l'aval (côté courant) pour présenter la coque à l'eau qui arrive.</div>
+                    <div><span class="text-white font-semibold">Gîte Sécuritaire</span> : Maintenue vers l'aval pour présenter la coque à l'eau qui arrive.</div>
                 </div>
             `;
         } else if (p === 1) {
@@ -517,12 +517,12 @@
         
         if(kayak.tilt > 0.2) {
             bar.style.left = "50%";
-            label.innerText = "Gîte Droite (Aval)";
+            label.innerText = "Gîte Droite";
             label.className = "text-xs mt-1 text-orange-400 font-bold";
             bar.style.background = "#f97316";
         } else if (kayak.tilt < -0.2) {
             bar.style.left = (50 - (Math.abs(kayak.tilt) * 50)) + "%";
-            label.innerText = "Gîte Gauche (Amont)";
+            label.innerText = "Gîte Gauche";
             label.className = "text-xs mt-1 text-blue-400 font-bold";
             bar.style.background = "#3b82f6";
         } else {
@@ -805,3 +805,4 @@
 </body>
 
 </html>
+
